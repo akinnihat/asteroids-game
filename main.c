@@ -1,7 +1,9 @@
 #include <SDL2/SDL.h>
+//#include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
 #define M_PI 3.14159265358979323846
 #define SCREEN_WIDTH 1280
@@ -34,7 +36,7 @@ typedef struct
 {
     SDL_Point coordinates;
     int diameter;
-    int speed;
+    int direction[2];
 } Asteroid;
 
 // typedef struct {
@@ -64,6 +66,10 @@ void handle_player_input(const Uint8* player_input, Player* player)
             player->speed -= 1.0f; 
         }
     }
+    if (player->coordinates.x > SCREEN_WIDTH) { player->coordinates.x = player->coordinates.x - SCREEN_WIDTH; }
+    else if (player->coordinates.x <= 0) { player->coordinates.x = player->coordinates.x + SCREEN_WIDTH; }
+    if (player->coordinates.y > SCREEN_HEIGHT) { player->coordinates.y = player->coordinates.y - SCREEN_HEIGHT; }
+    else if (player->coordinates.y <= 0) { player->coordinates.y = player->coordinates.y + SCREEN_HEIGHT; }
 }
 
 void draw_circle(SDL_Renderer* renderer, int32_t center_x, int32_t center_y, int32_t radius)
@@ -139,6 +145,12 @@ void draw_asteroids(SDL_Renderer* renderer, Asteroid* asteroids[], int32_t aster
     }
 }
 
+void display_score(SDL_Renderer* renderer, int score)
+{
+    // To be added
+    printf("\n");
+}
+
 int main(int argc, char ** argv)
 {
     bool quit = false;
@@ -189,26 +201,29 @@ int main(int argc, char ** argv)
     SDL_RenderDrawLines(renderer, player.points, 5);
     SDL_SetRenderTarget(renderer, NULL);
 
-    Asteroid asteroids[64];
+    Asteroid asteroids[8];
     int asteroid_count = 0;
-
-    while (asteroid_count < 64)
+    
+    srand(time(NULL));
+    while (asteroid_count < 8)
     {
-        srand(time(NULL));
-        int random_diameter = rand() % 20 + 10;
-        srand(time(NULL));
+        int random_diameter = rand() % 20 + 30;
         int random_x = rand() % SCREEN_WIDTH;
-        srand(time(NULL));
         int random_y = rand() % SCREEN_HEIGHT;
-
+        int random_y_direction = 0;
+        do 
+        { 
+            random_y_direction = (rand() % 5) - 2; 
+        } while (random_y_direction == 0);
+        int random_x_direction = (rand() % 5) - 2;
         Asteroid asteroid = { .coordinates.x = random_x, .coordinates.y = random_y,
-                                .diameter = random_diameter, .speed = 5};
+                                .diameter = random_diameter, .direction = {random_x_direction, random_y_direction}};
         asteroids[asteroid_count] = asteroid; 
         asteroid_count += 1;
-        printf("%d\n", asteroid_count);
     }
 
-    printf("%d\n", asteroids[21].coordinates.x);
+    int score = 0;
+    Uint32 last_time = SDL_GetTicks();
 
     while (!quit)
     {   
@@ -222,9 +237,18 @@ int main(int argc, char ** argv)
 
         SDL_SetRenderTarget(renderer, asteroid_texture);
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-        //SDL_RenderClear(renderer);
+        SDL_RenderClear(renderer);
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-        for (int i = 0; i < asteroid_count; i++) { draw_circle(renderer, asteroids[i].coordinates.x, asteroids[i].coordinates.y, asteroids[i].diameter); }
+        for (int i = 0; i < asteroid_count; i++) 
+        { 
+            draw_circle(renderer, asteroids[i].coordinates.x, asteroids[i].coordinates.y, asteroids[i].diameter); 
+            asteroids[i].coordinates.x += asteroids[i].direction[0];  
+            asteroids[i].coordinates.y += asteroids[i].direction[1];
+            if (asteroids[i].coordinates.x > SCREEN_WIDTH) { asteroids[i].coordinates.x = asteroids[i].coordinates.x - SCREEN_WIDTH; }
+            else if (asteroids[i].coordinates.x <= 0) { asteroids[i].coordinates.x = asteroids[i].coordinates.x + SCREEN_WIDTH; }
+            if (asteroids[i].coordinates.y > SCREEN_HEIGHT) { asteroids[i].coordinates.y = asteroids[i].coordinates.y - SCREEN_HEIGHT; }
+            else if (asteroids[i].coordinates.y <= 0) { asteroids[i].coordinates.y = asteroids[i].coordinates.y + SCREEN_HEIGHT; }
+        }
         //draw_asteroids(renderer, &asteroids, asteroid_count);
         SDL_SetRenderTarget(renderer, NULL);
 
@@ -235,8 +259,16 @@ int main(int argc, char ** argv)
         const Uint8* player_input = SDL_GetKeyboardState(NULL);
         handle_player_input(player_input, &player);
 
+        Uint32 current_time = SDL_GetTicks();
+        if (current_time - last_time >= 1000) 
+        {
+            score++;
+            last_time = current_time;
+        }
+        display_score(renderer, score);
+
         SDL_Rect player_dst_rect = {.x = player.coordinates.x, .y = player.coordinates.y, .w = 65, .h = 65};
-        SDL_Rect aster_dst_rect = {.x = 100, .y = 100, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT};
+        SDL_Rect aster_dst_rect = {.x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT};
         SDL_RenderCopyEx(renderer, asteroid_texture, NULL, &aster_dst_rect, 0, NULL, SDL_FLIP_NONE);
         SDL_RenderCopyEx(renderer, player.texture, NULL, &player_dst_rect, player.angle+90, NULL, SDL_FLIP_NONE);
         
