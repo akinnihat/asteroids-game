@@ -1,5 +1,5 @@
 #include <SDL2/SDL.h>
-//#include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <math.h>
@@ -8,6 +8,9 @@
 #define M_PI 3.14159265358979323846
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 720
+
+SDL_Color white = {255, 255, 255};
+
 
 enum PlayerPoints
 {
@@ -145,10 +148,44 @@ void draw_asteroids(SDL_Renderer* renderer, Asteroid* asteroids[], int32_t aster
     }
 }
 
-void display_score(SDL_Renderer* renderer, int score)
-{
+void display_score(SDL_Renderer* renderer, TTF_Font* font, int score) {
+
+    char score_text[1024];
+    sprintf(score_text, "%d", score);
+    char score_label[7] = "Score: ";
+    {
+        char result[1024] = {0};
+        snprintf(result, sizeof(result), "%s", score_label, score_text);
+
+        SDL_Surface* message_surface = TTF_RenderText_Solid(font, result, white); 
+        if (!message_surface) {
+            fprintf(stderr, "Could not create surface: %s\n", TTF_GetError());
+            TTF_CloseFont(font);
+            return;
+        }
+
+        SDL_Texture* message_texture = SDL_CreateTextureFromSurface(renderer, message_surface);
+        if (!message_texture) {
+            fprintf(stderr, "Could not create texture: %s\n", SDL_GetError());
+            SDL_FreeSurface(message_texture);
+            TTF_CloseFont(font);
+            return;
+        }
+
+        SDL_Rect message_rect = { .x =  SCREEN_WIDTH - 192, .y = 0,
+                                  .w = message_surface->w, .h = message_surface->h }; 
+
+        SDL_RenderCopy(renderer, message_texture, NULL, &message_rect);
+
+        SDL_FreeSurface(message_surface);
+        SDL_DestroyTexture(message_texture);
+    }
+}
+
+bool detect_collision(SDL_Point* player_coordinates, Asteroid* asteroids)
+{   
     // To be added
-    printf("\n");
+    printf("To be added.\n");
 }
 
 int main(int argc, char ** argv)
@@ -165,6 +202,12 @@ int main(int argc, char ** argv)
 
     // Init SDL
     SDL_Init(SDL_INIT_VIDEO);
+    TTF_Init();
+    TTF_Font* font = TTF_OpenFont("Ubuntu-Light.ttf", 32);
+    if (!font) {
+        fprintf(stderr, "Could not open font: %s\n", TTF_GetError());
+        return;
+    }
     SDL_Window * window = SDL_CreateWindow("AsteroidsGame",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
         SDL_Renderer * renderer = SDL_CreateRenderer(window, -1, 0);
@@ -224,6 +267,7 @@ int main(int argc, char ** argv)
 
     int score = 0;
     Uint32 last_time = SDL_GetTicks();
+    bool collided = false;
 
     while (!quit)
     {   
@@ -238,7 +282,7 @@ int main(int argc, char ** argv)
         SDL_SetRenderTarget(renderer, asteroid_texture);
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
         SDL_RenderClear(renderer);
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, SDL_ALPHA_OPAQUE);
         for (int i = 0; i < asteroid_count; i++) 
         { 
             draw_circle(renderer, asteroids[i].coordinates.x, asteroids[i].coordinates.y, asteroids[i].diameter); 
@@ -259,19 +303,20 @@ int main(int argc, char ** argv)
         const Uint8* player_input = SDL_GetKeyboardState(NULL);
         handle_player_input(player_input, &player);
 
+        SDL_Rect player_dst_rect = {.x = player.coordinates.x, .y = player.coordinates.y, .w = 65, .h = 65};
+        SDL_Rect aster_dst_rect = {.x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT};
+        SDL_RenderCopyEx(renderer, asteroid_texture, NULL, &aster_dst_rect, 0, NULL, SDL_FLIP_NONE);
+        SDL_RenderCopyEx(renderer, player.texture, NULL, &player_dst_rect, player.angle+90, NULL, SDL_FLIP_NONE);
+        
         Uint32 current_time = SDL_GetTicks();
         if (current_time - last_time >= 1000) 
         {
             score++;
             last_time = current_time;
         }
-        display_score(renderer, score);
+        display_score(renderer, font, score);
+        //collided = detect_collision(&player.coordinates, asteroids);
 
-        SDL_Rect player_dst_rect = {.x = player.coordinates.x, .y = player.coordinates.y, .w = 65, .h = 65};
-        SDL_Rect aster_dst_rect = {.x = 0, .y = 0, .w = SCREEN_WIDTH, .h = SCREEN_HEIGHT};
-        SDL_RenderCopyEx(renderer, asteroid_texture, NULL, &aster_dst_rect, 0, NULL, SDL_FLIP_NONE);
-        SDL_RenderCopyEx(renderer, player.texture, NULL, &player_dst_rect, player.angle+90, NULL, SDL_FLIP_NONE);
-        
         SDL_RenderPresent(renderer);
     }
  
@@ -280,6 +325,8 @@ int main(int argc, char ** argv)
     SDL_DestroyTexture(asteroid_texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    TTF_CloseFont(font);
+    TTF_Quit();
     SDL_Quit();
  
     return 0;
