@@ -2,7 +2,7 @@
 
 It's a simple experimental project developed using C and SDL2. 
 
-In order to test it out, download the files and in the project folder run:
+In order to test it out, clone the repo and run:
 ```
 make all
 ./AsteroidsGame
